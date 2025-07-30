@@ -8,6 +8,10 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+type UpdateRequest struct {
+	CurrencyPairCode string `json:"currency_pair"`
+}
+
 type UpdateResponse struct {
 	UpdateID string `json:"update_request_id"`
 }
@@ -49,7 +53,22 @@ func HandleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 func HandlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Recieved post req")
 
-	resp := UpdateResponse{UpdateID: "blum"}
+	if r.Header.Get("Content-Type") != "application/json" {
+		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	var updateRequest UpdateRequest
+	decoder := json.NewDecoder(r.Body)
+	err := decoder.Decode(&updateRequest)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Printf("  request %v\n", updateRequest)
+
+	resp := UpdateResponse{UpdateID: updateRequest.CurrencyPairCode}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
 }
