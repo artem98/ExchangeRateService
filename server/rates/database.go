@@ -27,11 +27,19 @@ func InitDataBaseInterface() error {
 		err = database.Ping()
 		if err == nil {
 			fmt.Println("Connected to database!")
-			return nil
+			break
 		}
 		time.Sleep(2 * time.Second)
+
 	}
-	return fmt.Errorf("failed to connect to DB: %v", err)
+	if err != nil {
+		return fmt.Errorf("failed to connect to DB: %v", err)
+	}
+	err = fillRatesAtStart()
+	if err != nil {
+		return fmt.Errorf("failed to fill DB: %v", err)
+	}
+	return nil
 }
 
 func CloseDB() {
@@ -40,8 +48,39 @@ func CloseDB() {
 	}
 }
 
-func fillRatesAtStart() {
+func fillRatesAtStart() error {
+	if database == nil {
+		return fmt.Errorf("database not initialized")
+	}
 
+	rows, err := database.Query("SELECT currency1, currency2 FROM rates")
+	if err != nil {
+		return fmt.Errorf("failed to fetch currency pairs: %w", err)
+	}
+	defer rows.Close()
+
+	fmt.Println("Start filling DB...")
+	for rows.Next() {
+		var currency1, currency2 string
+		err := rows.Scan(&currency1, &currency2)
+		if err != nil {
+			return fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		rate, err := fetchRate(currency1, currency2)
+		if err != nil {
+			return err
+		}
+
+		err = updateRate(currency1, currency2, rate)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("Finished filling DB...")
+	return nil
 }
 
 func parseCurrencyPair(input string) (string, string, error) {
@@ -65,7 +104,7 @@ func parseCurrencyPair(input string) (string, string, error) {
 func placeRequest(CurrencyPairCode string) (uint64, error) {
 	var id uint64
 
-	cur1, cur2, err := parseCurrencyPair(CurrencyPairCode)
+	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
 	if err != nil {
 		return 0, err
 	}
@@ -79,23 +118,73 @@ func placeRequest(CurrencyPairCode string) (uint64, error) {
         VALUES ($1, $2, $3)
         RETURNING id;
     `
-	err = database.QueryRow(query, cur1, cur2, "submitted").Scan(&id)
+	err = database.QueryRow(query, currency1, currency2, "submitted").Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert rate: %w", err)
 	}
 
-	PlanJob(Job{Currency1: cur1, Currency2: cur2, reqId: id})
+	PlanJob(Job{Currency1: currency1, Currency2: currency2, reqId: id})
 
 	return id, nil
 }
 
 func getRateByPair(CurrencyPairCode string) (float64, error) {
-	return 0, errors.New("no such pair")
+	if database == nil {
+		return 0, errors.New("database not initialized")
+	}
+
+	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
+	if err != nil {
+		return 0, err
+	}
+
+	var rate float64
+	query := `
+        SELECT rate FROM rates
+        WHERE currency1 = $1 AND currency2 = $2
+        LIMIT 1
+    `
+	err = database.QueryRow(query, currency1, currency2).Scan(&rate)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, errors.New("no such pair")
+		}
+		return 0, fmt.Errorf("db query error: %w", err)
+	}
+
+	return rate, nil
 }
 
 func getRateByRequestId(requestId uint64) (float64, error) {
+	if database == nil {
+		return 0, errors.New("database not initialized")
+	}
 
-	return float64(requestId) * 0.1, nil
+	var currency1, currency2 string
+	err := database.QueryRow(`
+        SELECT currency1, currency2 FROM update_requests
+        WHERE id = $1
+    `, requestId).Scan(&currency1, &currency2)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("no request with id %d", requestId)
+		}
+		return 0, fmt.Errorf("failed to query request: %w", err)
+	}
+
+	var rate float64
+	err = database.QueryRow(`
+        SELECT rate FROM rates
+        WHERE currency1 = $1 AND currency2 = $2
+    `, currency1, currency2).Scan(&rate)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, fmt.Errorf("no rate for pair %s/%s", currency1, currency2)
+		}
+		return 0, fmt.Errorf("failed to get rate: %w", err)
+	}
+
+	return rate, nil
 }
 
 func markRequestAsProcessed(requestId uint64) error {
