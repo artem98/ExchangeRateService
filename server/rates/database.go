@@ -2,8 +2,11 @@ package rates
 
 import "errors"
 
-func placeRequest() (uint64, error) {
-	return 0, nil
+var req uint64 = 0
+
+func placeRequest(CurrencyPairCode string) (uint64, error) {
+	req++
+	return req, nil
 }
 
 func getRateByPair(CurrencyPairCode string) (float64, error) {

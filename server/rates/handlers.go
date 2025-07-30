@@ -14,7 +14,7 @@ type UpdateRequest struct {
 }
 
 type UpdateResponse struct {
-	UpdateID string `json:"update_request_id"`
+	UpdateID uint64 `json:"update_request_id"`
 }
 
 type RateResponse struct {
@@ -94,9 +94,19 @@ func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if updateRequest.CurrencyPairCode == "" {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+	}
+
 	fmt.Printf("  request %v\n", updateRequest)
 
-	response := UpdateResponse{UpdateID: updateRequest.CurrencyPairCode}
+	requestId, err := placeRequest(updateRequest.CurrencyPairCode)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	response := UpdateResponse{UpdateID: requestId}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
