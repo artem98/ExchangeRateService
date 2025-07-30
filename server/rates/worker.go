@@ -84,7 +84,7 @@ var fakeRates = [...]float64{0.04, 0.89, 1.35, 33, 18.1, 9, 0.81, 0.33, 12.34, 2
 var it = 0
 
 func fetchRateFake(currency1, currency2 string) (float64, error) {
-	time.Sleep(0 * time.Second)
+	time.Sleep(40 * time.Second)
 	it++
 	it = it % len(fakeRates)
 	return fakeRates[it], nil

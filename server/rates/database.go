@@ -53,7 +53,7 @@ func fillRatesAtStart() error {
 		return fmt.Errorf("database not initialized")
 	}
 
-	rows, err := database.Query("SELECT currency1, currency2 FROM rates")
+	rows, err := database.Query("SELECT currency1, currency2, rate FROM rates")
 	if err != nil {
 		return fmt.Errorf("failed to fetch currency pairs: %w", err)
 	}
@@ -62,9 +62,14 @@ func fillRatesAtStart() error {
 	fmt.Println("Start filling DB...")
 	for rows.Next() {
 		var currency1, currency2 string
-		err := rows.Scan(&currency1, &currency2)
+		var tableRate sql.NullFloat64
+		err := rows.Scan(&currency1, &currency2, &tableRate)
 		if err != nil {
 			return fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		if tableRate.Valid {
+			continue
 		}
 
 		rate, err := fetchRate(currency1, currency2)
