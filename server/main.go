@@ -19,6 +19,13 @@ func handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	err := rates.InitDataBaseInterface()
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer rates.CloseDB()
+
 	router := chi.NewRouter()
 
 	router.Route("/rates", rates.HandleRatesRequest)
