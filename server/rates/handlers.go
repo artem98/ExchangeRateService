@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -18,7 +19,8 @@ type UpdateResponse struct {
 }
 
 type RateResponse struct {
-	Rate float64 `json:"rate"`
+	Rate      float64   `json:"rate"`
+	Timestamp time.Time `json:"update_time"`
 }
 
 func HandleRatesRequest(r chi.Router) {
@@ -44,13 +46,13 @@ func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Recieved GET req by code", currencyPair)
 
-	rate, err := getRateByPair(currencyPair)
+	rate, timestamp, err := getRateByPairCode(currencyPair)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(RateResponse{Rate: rate})
+	json.NewEncoder(w).Encode(RateResponse{Rate: rate, Timestamp: timestamp})
 }
 
 func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
@@ -69,13 +71,13 @@ func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rate, err := getRateByRequestId(id)
+	rate, timestamp, err := getRateByRequestId(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(RateResponse{Rate: rate})
+	json.NewEncoder(w).Encode(RateResponse{Rate: rate, Timestamp: timestamp})
 }
 
 func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {

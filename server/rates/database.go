@@ -128,36 +128,41 @@ func placeRequest(CurrencyPairCode string) (uint64, error) {
 	return id, nil
 }
 
-func getRateByPair(CurrencyPairCode string) (float64, error) {
-	if database == nil {
-		return 0, errors.New("database not initialized")
-	}
-
+func getRateByPairCode(CurrencyPairCode string) (float64, time.Time, error) {
 	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
 	if err != nil {
-		return 0, err
+		return 0, time.Time{}, err
+	}
+
+	return getRateByPair(currency1, currency2)
+}
+
+func getRateByPair(currency1, currency2 string) (float64, time.Time, error) {
+	if database == nil {
+		return 0, time.Time{}, errors.New("database not initialized")
 	}
 
 	var rate float64
+	var timestamp time.Time
 	query := `
-        SELECT rate FROM rates
+        SELECT rate, update_time FROM rates
         WHERE currency1 = $1 AND currency2 = $2
         LIMIT 1
     `
-	err = database.QueryRow(query, currency1, currency2).Scan(&rate)
+	err := database.QueryRow(query, currency1, currency2).Scan(&rate, &timestamp)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, errors.New("no such pair")
+			return 0, time.Time{}, errors.New("no such pair")
 		}
-		return 0, fmt.Errorf("db query error: %w", err)
+		return 0, time.Time{}, fmt.Errorf("db query error: %w", err)
 	}
 
-	return rate, nil
+	return rate, timestamp, nil
 }
 
-func getRateByRequestId(requestId uint64) (float64, error) {
+func getRateByRequestId(requestId uint64) (float64, time.Time, error) {
 	if database == nil {
-		return 0, errors.New("database not initialized")
+		return 0, time.Time{}, errors.New("database not initialized")
 	}
 
 	var currency1, currency2 string
@@ -167,24 +172,12 @@ func getRateByRequestId(requestId uint64) (float64, error) {
     `, requestId).Scan(&currency1, &currency2)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return 0, fmt.Errorf("no request with id %d", requestId)
+			return 0, time.Time{}, fmt.Errorf("no request with id %d", requestId)
 		}
-		return 0, fmt.Errorf("failed to query request: %w", err)
+		return 0, time.Time{}, fmt.Errorf("failed to query request: %w", err)
 	}
 
-	var rate float64
-	err = database.QueryRow(`
-        SELECT rate FROM rates
-        WHERE currency1 = $1 AND currency2 = $2
-    `, currency1, currency2).Scan(&rate)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return 0, fmt.Errorf("no rate for pair %s/%s", currency1, currency2)
-		}
-		return 0, fmt.Errorf("failed to get rate: %w", err)
-	}
-
-	return rate, nil
+	return getRateByPair(currency1, currency2)
 }
 
 func markRequestAsProcessed(requestId uint64) error {
