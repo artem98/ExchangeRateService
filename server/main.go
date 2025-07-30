@@ -9,28 +9,24 @@ import (
 	// "encoding/json"
 
 	"github.com/artem98/ExchangeRateService/server/rates"
+	"github.com/artem98/ExchangeRateService/server/rates/db"
 )
 
-var reqCount int = 0
-
-func handler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello client!", reqCount)
-	reqCount++
+func defaultHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Hello client!")
 }
 
 func main() {
-	err := rates.InitDataBaseInterface()
+	err := db.InitDataBaseInterface()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	defer rates.CloseDB()
+	defer db.CloseDB()
 
 	router := chi.NewRouter()
-
 	router.Route("/rates", rates.HandleRatesRequest)
-
-	router.HandleFunc("/", handler)
+	router.HandleFunc("/", defaultHandler)
 
 	fmt.Println("Server started")
 	http.ListenAndServe(":8080", router)

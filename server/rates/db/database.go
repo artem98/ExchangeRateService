@@ -1,4 +1,4 @@
-package rates
+package db
 
 import (
 	"database/sql"
@@ -35,10 +35,12 @@ func InitDataBaseInterface() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to DB: %v", err)
 	}
+
 	err = fillRatesAtStart()
 	if err != nil {
 		return fmt.Errorf("failed to fill DB: %v", err)
 	}
+
 	return nil
 }
 
@@ -72,11 +74,7 @@ func fillRatesAtStart() error {
 			continue
 		}
 
-		rate, err := fetchRate(currency1, currency2)
-		if err != nil {
-			return err
-		}
-
+		var rate float64 = 0. // had to do this, because exchangeratesapi.io has small limit of 100 requests
 		err = updateRate(currency1, currency2, rate)
 
 		if err != nil {
@@ -106,7 +104,7 @@ func parseCurrencyPair(input string) (string, string, error) {
 	return parts[0], parts[1], nil
 }
 
-func placeRequest(CurrencyPairCode string) (uint64, error) {
+func PlaceRequest(CurrencyPairCode string) (uint64, error) {
 	var id uint64
 
 	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
@@ -128,12 +126,12 @@ func placeRequest(CurrencyPairCode string) (uint64, error) {
 		return 0, fmt.Errorf("failed to insert rate: %w", err)
 	}
 
-	PlanJob(Job{Currency1: currency1, Currency2: currency2, reqId: id})
+	planJob(job{Currency1: currency1, Currency2: currency2, ReqId: id})
 
 	return id, nil
 }
 
-func getRateByPairCode(CurrencyPairCode string) (float64, time.Time, error) {
+func GetRateByPairCode(CurrencyPairCode string) (float64, time.Time, error) {
 	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
 	if err != nil {
 		return 0, time.Time{}, err
@@ -165,7 +163,7 @@ func getRateByPair(currency1, currency2 string) (float64, time.Time, error) {
 	return rate, timestamp, nil
 }
 
-func getRateByRequestId(requestId uint64) (float64, time.Time, error) {
+func GetRateByRequestId(requestId uint64) (float64, time.Time, error) {
 	if database == nil {
 		return 0, time.Time{}, errors.New("database not initialized")
 	}

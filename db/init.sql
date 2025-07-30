@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS currencies (
 );
 
 INSERT INTO currencies (code)
-VALUES ('USD'), ('EUR'), ('GBP'), ('RUB'), ('MXN')
+VALUES ('USD'), ('EUR'), ('GBP'), ('MXN')
 ON CONFLICT (code) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS rates (

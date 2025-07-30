@@ -1,4 +1,4 @@
-package rates
+package db
 
 import (
 	"encoding/json"
@@ -8,39 +8,61 @@ import (
 	"time"
 )
 
-type Job struct {
+type job struct {
 	Currency1 string
 	Currency2 string
-	reqId     uint64
+	ReqId     uint64
 }
 
 const queueSize = 200
 
-var Jobs = make(chan Job, queueSize)
-var hasStarted = false
+var jobs = make(chan job, queueSize)
 
-func PlanJob(job Job) {
+var hasStarted bool = false
+
+func planJob(job job) {
 	if !hasStarted {
 		start()
 	}
-	Jobs <- job
+	jobs <- job
 }
 
 func start() {
 	hasStarted = true
 	go func() {
-		for job := range Jobs {
+		for job := range jobs {
 			fmt.Println("Worker received currency pair", job)
 
 			err := processJob(job)
 			if err != nil {
-				fmt.Println("Failed to process request ", job.reqId, ":", err)
+				fmt.Println("Failed to process request ", job.ReqId, ":", err)
 			}
 		}
 	}()
 }
 
-const useRealExternalApi = false
+func processJob(job job) error {
+
+	var rate float64
+	var err error
+
+	rate, err = fetchRate(job.Currency1, job.Currency2)
+
+	if err != nil {
+		markRequestAsFailed(job.ReqId)
+		return err
+	}
+
+	err = updateRate(job.Currency1, job.Currency2, rate)
+	if err != nil {
+		markRequestAsFailed(job.ReqId)
+		return err
+	}
+
+	return markRequestAsProcessed(job.ReqId)
+}
+
+const useRealExternalApi = true
 
 func fetchRate(currency1, currency2 string) (float64, error) {
 	fmt.Println("Fetching rate for", currency1, "/", currency2)
@@ -59,32 +81,11 @@ func fetchRate(currency1, currency2 string) (float64, error) {
 	return rate, err
 }
 
-func processJob(job Job) error {
-
-	var rate float64
-	var err error
-
-	rate, err = fetchRate(job.Currency1, job.Currency2)
-
-	if err != nil {
-		markRequestAsFailed(job.reqId)
-		return err
-	}
-
-	err = updateRate(job.Currency1, job.Currency2, rate)
-	if err != nil {
-		markRequestAsFailed(job.reqId)
-		return err
-	}
-
-	return markRequestAsProcessed(job.reqId)
-}
-
-var fakeRates = [...]float64{0.04, 0.89, 1.35, 33, 18.1, 9, 0.81, 0.33, 12.34, 2.93, 2.02, 1.09, 3.65, 0.11}
+var fakeRates = [...]float64{0.04, 0.89, 1.35, 33, 18.1, 9, 0.81, 0.33, 12.34, 2.93, 2.02, 1.09, 3.65, 0.11, 5.4}
 var it = 0
 
 func fetchRateFake(currency1, currency2 string) (float64, error) {
-	time.Sleep(40 * time.Second)
+	time.Sleep(3 * time.Second)
 	it++
 	it = it % len(fakeRates)
 	return fakeRates[it], nil
@@ -108,7 +109,7 @@ func fetchRateReal(currency1, currency2 string) (float64, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("API error: %s", resp.Status)
+		return 0, fmt.Errorf("API error: %s, %s", resp.Status)
 	}
 
 	var parsed externalRateResponse

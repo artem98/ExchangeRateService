@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/artem98/ExchangeRateService/server/rates/db"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -44,15 +45,19 @@ func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Recieved GET req by code", currencyPair)
+	fmt.Println("Received GET req by code", currencyPair)
 
-	rate, timestamp, err := getRateByPairCode(currencyPair)
+	rate, timestamp, err := db.GetRateByPairCode(currencyPair)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(RateResponse{Rate: rate, Timestamp: timestamp})
+	err = json.NewEncoder(w).Encode(RateResponse{Rate: rate, Timestamp: timestamp})
+	if err != nil {
+		http.Error(w, "internal json problem", http.StatusInternalServerError)
+	}
 }
 
 func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
@@ -71,17 +76,20 @@ func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rate, timestamp, err := getRateByRequestId(id)
+	rate, timestamp, err := db.GetRateByRequestId(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(RateResponse{Rate: rate, Timestamp: timestamp})
+	err = json.NewEncoder(w).Encode(RateResponse{Rate: rate, Timestamp: timestamp})
+	if err != nil {
+		http.Error(w, "internal json problem", http.StatusInternalServerError)
+	}
 }
 
 func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Recieved post req_")
+	fmt.Println("Recieved POST req")
 
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
@@ -98,11 +106,12 @@ func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 
 	if updateRequest.CurrencyPairCode == "" {
 		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
 	}
 
-	fmt.Printf("  request %v\n", updateRequest)
+	fmt.Printf("  request: %v\n", updateRequest)
 
-	requestId, err := placeRequest(updateRequest.CurrencyPairCode)
+	requestId, err := db.PlaceRequest(updateRequest.CurrencyPairCode)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -110,5 +119,8 @@ func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 
 	response := UpdateResponse{UpdateID: requestId}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	err = json.NewEncoder(w).Encode(response)
+	if err != nil {
+		http.Error(w, "internal json problem", http.StatusInternalServerError)
+	}
 }
