@@ -19,6 +19,7 @@ func main() {
 
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Client started. Now you can send commands. Send \"help\" to get full list of commands.")
+	printHelp()
 MAIN_LOOP:
 	for {
 		fmt.Print("> ")
