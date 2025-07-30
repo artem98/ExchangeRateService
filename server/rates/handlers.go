@@ -10,7 +10,7 @@ import (
 )
 
 type UpdateRequest struct {
-	CurrencyPairCode string `json:"currency_pair"`
+	CurrencyPairCode string `json:"pair"`
 }
 
 type UpdateResponse struct {
