@@ -74,7 +74,10 @@ func fillRatesAtStart() error {
 			continue
 		}
 
-		var rate float64 = 0. // had to do this, because exchangeratesapi.io has small limit of 100 requests
+		rate, err := fetchRate(currency1, currency2)
+		if err != nil {
+			return err
+		}
 		err = updateRate(currency1, currency2, rate)
 
 		if err != nil {

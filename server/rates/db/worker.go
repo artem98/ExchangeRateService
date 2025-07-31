@@ -96,11 +96,12 @@ const apiKey = "0cd612177560a71ffc4117930b976bb8"
 type externalRateResponse struct {
 	Rates map[string]float64 `json:"rates"`
 	Base  string             `json:"base"`
+	Date  string             `json:"date"`
 }
 
 func fetchRateReal(currency1, currency2 string) (float64, error) {
-	url := fmt.Sprintf("https://api.exchangeratesapi.io/v1/latest?base=%s&symbols=%s&access_key=%s",
-		strings.ToUpper(currency1), strings.ToUpper(currency2), apiKey)
+	url := fmt.Sprintf("https://api.frankfurter.app/latest?from=%s&to=%s",
+		strings.ToUpper(currency1), strings.ToUpper(currency2))
 
 	resp, err := http.Get(url)
 	if err != nil {
@@ -109,7 +110,7 @@ func fetchRateReal(currency1, currency2 string) (float64, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("API error: %s, %s", resp.Status)
+		return 0, fmt.Errorf("API error: %s", resp.Status)
 	}
 
 	var parsed externalRateResponse

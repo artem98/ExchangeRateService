@@ -4,9 +4,9 @@ This application provides a currency exchange rate service with asynchronous upd
 
 ## Project structure
 
-- `server/` — main service with PostgreSQL database
-- `client/` — optional Go CLI client for testing requests
-- `docker-compose.yml` — launches the database and the server in containers
+- `server/` вЂ” main service with PostgreSQL database
+- `client/` вЂ” optional Go CLI client for testing requests
+- `docker-compose.yml` вЂ” launches the database and the server in containers
 
 ---
 
@@ -76,26 +76,26 @@ The `client` is a simple Go-based CLI tool for testing.
 
 ---
 
-## Русская версия
+## Р СѓСЃСЃРєР°СЏ РІРµСЂСЃРёСЏ
 
-Это сервис валютных котировок с асинхронным обновлением и простой клиент для ручного тестирования.
+Р­С‚Рѕ СЃРµСЂРІРёСЃ РІР°Р»СЋС‚РЅС‹С… РєРѕС‚РёСЂРѕРІРѕРє СЃ Р°СЃРёРЅС…СЂРѕРЅРЅС‹Рј РѕР±РЅРѕРІР»РµРЅРёРµРј Рё РїСЂРѕСЃС‚РѕР№ РєР»РёРµРЅС‚ РґР»СЏ СЂСѓС‡РЅРѕРіРѕ С‚РµСЃС‚РёСЂРѕРІР°РЅРёСЏ.
 
-### Структура
+### РЎС‚СЂСѓРєС‚СѓСЂР°
 
-- `server/` — серверное приложение с БД PostgreSQL
-- `client/` — вспомогательный Go-клиент для ручных тестов (не в контейнере)
-- `docker-compose.yml` — запускает базу и сервер
+- `server/` вЂ” СЃРµСЂРІРµСЂРЅРѕРµ РїСЂРёР»РѕР¶РµРЅРёРµ СЃ Р‘Р” PostgreSQL
+- `client/` вЂ” РІСЃРїРѕРјРѕРіР°С‚РµР»СЊРЅС‹Р№ Go-РєР»РёРµРЅС‚ РґР»СЏ СЂСѓС‡РЅС‹С… С‚РµСЃС‚РѕРІ (РЅРµ РІ РєРѕРЅС‚РµР№РЅРµСЂРµ)
+- `docker-compose.yml` вЂ” Р·Р°РїСѓСЃРєР°РµС‚ Р±Р°Р·Сѓ Рё СЃРµСЂРІРµСЂ
 
 ---
 
-### Запуск сервера (Docker)
+### Р—Р°РїСѓСЃРє СЃРµСЂРІРµСЂР° (Docker)
 
-1. Соберите и запустите:
+1. РЎРѕР±РµСЂРёС‚Рµ Рё Р·Р°РїСѓСЃС‚РёС‚Рµ:
    ```sh
    docker-compose up --build
    ```
 
-2. Сервер будет доступен по адресу:
+2. РЎРµСЂРІРµСЂ Р±СѓРґРµС‚ РґРѕСЃС‚СѓРїРµРЅ РїРѕ Р°РґСЂРµСЃСѓ:
    ```
    http://localhost:8080
    ```
@@ -104,37 +104,37 @@ The `client` is a simple Go-based CLI tool for testing.
 
 ### API
 
-1. **Запросить обновление курса**  
+1. **Р—Р°РїСЂРѕСЃРёС‚СЊ РѕР±РЅРѕРІР»РµРЅРёРµ РєСѓСЂСЃР°**  
    `POST /rates/update_requests`  
-   Тело запроса:
+   РўРµР»Рѕ Р·Р°РїСЂРѕСЃР°:
    ```json
    { "pair": "EUR/USD" }
    ```
 
-2. **Получить курс по ID обновления**  
+2. **РџРѕР»СѓС‡РёС‚СЊ РєСѓСЂСЃ РїРѕ ID РѕР±РЅРѕРІР»РµРЅРёСЏ**  
    `GET /rates/update_requests/<id>`
 
-3. **Получить последний курс по валютной паре**  
+3. **РџРѕР»СѓС‡РёС‚СЊ РїРѕСЃР»РµРґРЅРёР№ РєСѓСЂСЃ РїРѕ РІР°Р»СЋС‚РЅРѕР№ РїР°СЂРµ**  
     `GET /rates?pair=EUR/USD`
 
 ---
 
-### Использование клиента
+### РСЃРїРѕР»СЊР·РѕРІР°РЅРёРµ РєР»РёРµРЅС‚Р°
 
-1. Перейди в папку `client` и собери:
+1. РџРµСЂРµР№РґРё РІ РїР°РїРєСѓ `client` Рё СЃРѕР±РµСЂРё:
    ```sh
    cd client
    go build -o client .
    ```
 
-2. Используй:
+2. РСЃРїРѕР»СЊР·СѓР№:
    ```sh
    ./client
    ```
 
 ---
 
-### Требования
+### РўСЂРµР±РѕРІР°РЅРёСЏ
 
 - Go 1.24.5+
-- Docker и Docker Compose
+- Docker Рё Docker Compose
