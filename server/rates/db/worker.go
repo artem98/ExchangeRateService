@@ -91,8 +91,6 @@ func fetchRateFake(currency1, currency2 string) (float64, error) {
 	return fakeRates[it], nil
 }
 
-const apiKey = "0cd612177560a71ffc4117930b976bb8"
-
 type externalRateResponse struct {
 	Rates map[string]float64 `json:"rates"`
 	Base  string             `json:"base"`
