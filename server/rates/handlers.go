@@ -26,13 +26,13 @@ type RateResponse struct {
 
 func HandleRatesRequest(r chi.Router) {
 	r.Route("/update_requests", func(r chi.Router) {
-		r.Get("/{id}", handleGetRateByUpdateId)
-		r.Post("/", handlePostRateUpdateRequest)
+		r.Get("/{id}", withRecovery(handleGetRateByUpdateId))
+		r.Post("/", withRecovery(handlePostRateUpdateRequest))
 		r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Only POST and GET are allowed", http.StatusMethodNotAllowed)
 		}))
 	})
-	r.Get("/", handleGetRateByCode)
+	r.Get("/", withRecovery(handleGetRateByCode))
 	r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
 	}))
@@ -122,5 +122,17 @@ func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
 		http.Error(w, "internal json problem", http.StatusInternalServerError)
+	}
+}
+
+func withRecovery(h http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rec := recover(); rec != nil {
+				fmt.Println("Recovered in handler:", rec)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+		h(w, r)
 	}
 }

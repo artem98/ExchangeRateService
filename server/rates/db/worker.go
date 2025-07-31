@@ -41,10 +41,15 @@ func start() {
 	}()
 }
 
-func processJob(job job) error {
-
+func processJob(job job) (err error) {
 	var rate float64
-	var err error
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("Recovered in processJob:", r)
+			markRequestAsFailed(job.ReqId)
+			err = fmt.Errorf("panic occurred: %v", r)
+		}
+	}()
 
 	rate, err = fetchRate(job.Currency1, job.Currency2)
 
