@@ -1,0 +1,107 @@
+openapi: 3.0.3
+info:
+  version: 1.0.0
+  title: Exchange Rate Service
+  description: Simple currency rate service with async update and lookup by update ID.
+
+paths:
+  /rates/:
+    get:
+      summary: Get the latest rate by currency pair code
+      parameters:
+        - name: currency_pair
+          in: query
+          required: true
+          schema:
+            type: string
+            example: EUR/USD
+      responses:
+        '200':
+          description: Latest exchange rate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateResponse'
+        '400':
+          description: Missing currency pair
+        '500':
+          description: Rate not found or Database problem or Invalid currency pair
+
+  /rates/update_requests/:
+    post:
+      summary: Trigger an update for a currency pair
+      requestBody:
+        description: Update request parameters
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRequest'
+      responses:
+        '202':
+          description: Update request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateResponse'
+        '400':
+          description: Invalid request body
+        '415':
+          description: Not json object
+        '500':
+          description: Database or JSON problem
+
+
+  /rates/update_requests/{id}:
+    get:
+      summary: Get rate by update request ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Update request ID, received from response to update request POST
+          schema:
+            type: integer
+            format: uint64
+      responses:
+        '200':
+          description: Rate info for given update ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RateResponse'
+        '404':
+          description: Update ID not found
+        '500':
+          description: Internal Database problem
+
+components:
+  schemas:
+    UpdateRequest:
+      type: object
+      properties:
+        pair:
+          type: string
+          example: EUR/USD
+      required:
+        - pair
+
+    UpdateResponse:
+      type: object
+      properties:
+        update_request_id:
+          type: integer
+          format: uint64
+          example: 42
+
+    RateResponse:
+      type: object
+      description: Rate for currency pair with last update time
+      properties:
+        rate:
+          type: number
+          format: double
+          example: 1.0975
+        update_time:
+          type: string
+          format: date-time
