@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/artem98/ExchangeRateService/server/rates/external"
 	_ "github.com/lib/pq"
 )
 
@@ -74,7 +75,7 @@ func fillRatesAtStart() error {
 			continue
 		}
 
-		rate, err := fetchRate(currency1, currency2)
+		rate, err := external.FetchRate(currency1, currency2)
 		if err != nil {
 			return err
 		}
