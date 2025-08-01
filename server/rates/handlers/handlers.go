@@ -30,10 +30,15 @@ type Worker interface {
 	PlanJob(job worker.Job)
 }
 
+type RateJobsCache interface {
+	Get(currency1, currency2 string) (uint64, bool)
+	Set(currency1, currency2 string, id uint64)
+}
+
 type Handler struct {
 	Db     db.DataBase
 	Worker Worker
-	Cache  *worker.RateJobsCache
+	Cache  RateJobsCache
 }
 
 func (h *Handler) HandleRates(r chi.Router) {

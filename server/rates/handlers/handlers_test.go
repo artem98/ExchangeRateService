@@ -49,6 +49,19 @@ func (m *mockWorker) PlanJob(job worker.Job) {
 	m.planned = append(m.planned, job)
 }
 
+type mockCache struct {
+	get func(currency1, currency2 string) (uint64, bool)
+	set func(currency1, currency2 string, id uint64)
+}
+
+func (m *mockCache) Get(currency1, currency2 string) (uint64, bool) {
+	return m.get(currency1, currency2)
+}
+
+func (m *mockCache) Set(currency1, currency2 string, id uint64) {
+	m.set(currency1, currency2, id)
+}
+
 func TestHandleGetRateByCode(t *testing.T) {
 	handler := &Handler{
 		Db: &mockDb{
@@ -60,6 +73,7 @@ func TestHandleGetRateByCode(t *testing.T) {
 			},
 		},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/?currency_pair=EUR/USD", nil)
@@ -91,6 +105,7 @@ func TestHandleGetRateByCodeDBError(t *testing.T) {
 			},
 		},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/?currency_pair=EUR/USD", nil)
@@ -110,6 +125,7 @@ func TestHandleGetRateByCodeIncorrectCode(t *testing.T) {
 	handler := &Handler{
 		Db:     &mockDb{},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/?currency_pair=EURUSD", nil)
@@ -129,6 +145,7 @@ func TestHandleGetRateByCodeNoParam(t *testing.T) {
 	handler := &Handler{
 		Db:     &mockDb{},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -155,6 +172,7 @@ func TestHandleGetRateByUpdateId(t *testing.T) {
 			},
 		},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	r := chi.NewRouter()
@@ -184,6 +202,7 @@ func TestHandleGetRateByUpdateIdNotUint64(t *testing.T) {
 			},
 		},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	r := chi.NewRouter()
@@ -210,6 +229,7 @@ func TestHandleGetRateByUpdateIdDBError(t *testing.T) {
 			},
 		},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	r := chi.NewRouter()
@@ -239,6 +259,7 @@ func TestHandleGetRateByUpdateIdNoId(t *testing.T) {
 			},
 		},
 		Worker: &mockWorker{},
+		Cache:  &mockCache{},
 	}
 
 	r := chi.NewRouter()
@@ -257,6 +278,52 @@ func TestHandleGetRateByUpdateIdNoId(t *testing.T) {
 	}
 }
 
+func TestHandlePostRateUpdateRequestFoundInCache(t *testing.T) {
+	mockW := &mockWorker{}
+	handler := &Handler{
+		Db: &mockDb{
+			placeRequest: func(cur1, cur2 string) (uint64, error) {
+				if cur1 == "EUR" && cur2 == "USD" {
+					return 777, nil
+				}
+				return 0, errors.New("invalid")
+			},
+		},
+		Worker: mockW,
+		Cache: &mockCache{
+			get: func(currency1, currency2 string) (uint64, bool) {
+				return 189, true
+			},
+			set: func(currency1, currency2 string, id uint64) {},
+		},
+	}
+
+	body := []byte(`{"pair":"EUR/USD"}`)
+	req := httptest.NewRequest(http.MethodPost, "/update_requests", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	w := httptest.NewRecorder()
+	handler.handlePostRateUpdateRequest(w, req)
+
+	res := w.Result()
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		t.Errorf("expected 200, got %d", res.StatusCode)
+	}
+
+	var resp UpdateResponse
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		t.Errorf("failed to decode response: %v", err)
+	}
+	if resp.UpdateID != 189 {
+		t.Errorf("expected ID 189, got %d", resp.UpdateID)
+	}
+	if len(mockW.planned) != 0 {
+		t.Errorf("expected no job to be planned")
+	}
+}
+
 func TestHandlePostRateUpdateRequest(t *testing.T) {
 	mockW := &mockWorker{}
 	handler := &Handler{
@@ -269,6 +336,12 @@ func TestHandlePostRateUpdateRequest(t *testing.T) {
 			},
 		},
 		Worker: mockW,
+		Cache: &mockCache{
+			get: func(currency1, currency2 string) (uint64, bool) {
+				return 0, false
+			},
+			set: func(currency1, currency2 string, id uint64) {},
+		},
 	}
 
 	body := []byte(`{"pair":"EUR/USD"}`)
@@ -309,6 +382,7 @@ func TestHandlePostRateUpdateRequestNotJson(t *testing.T) {
 			},
 		},
 		Worker: mockW,
+		Cache:  &mockCache{},
 	}
 
 	body := []byte(`{"pair":"EUR/USD"}`)
@@ -337,6 +411,7 @@ func TestHandlePostRateUpdateRequestWrongJson(t *testing.T) {
 			},
 		},
 		Worker: mockW,
+		Cache:  &mockCache{},
 	}
 
 	body := []byte(`{"currs:"EUR/USD"}`)
@@ -366,6 +441,7 @@ func TestHandlePostRateUpdateRequestWrongJsonValues(t *testing.T) {
 			},
 		},
 		Worker: mockW,
+		Cache:  &mockCache{},
 	}
 
 	body := []byte(`{"currs":"EUR/USD"}`)
@@ -395,6 +471,7 @@ func TestHandlePostRateUpdateRequestWrongPair(t *testing.T) {
 			},
 		},
 		Worker: mockW,
+		Cache:  &mockCache{},
 	}
 
 	body := []byte(`{"pair":"EUR/fUSD"}`)
@@ -421,6 +498,12 @@ func TestHandlePostRateUpdateRequestDBError(t *testing.T) {
 			},
 		},
 		Worker: mockW,
+		Cache: &mockCache{
+			get: func(currency1, currency2 string) (uint64, bool) {
+				return 0, false
+			},
+			set: func(currency1, currency2 string, id uint64) {},
+		},
 	}
 
 	body := []byte(`{"pair":"EUR/USD"}`)
