@@ -122,7 +122,7 @@ func (h *Handler) handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	fmt.Printf("  request: %v\n", updateRequest)
+	fmt.Printf("  Request data: %v\n", updateRequest)
 
 	currency1, currency2, err := utils.ParseCurrencyPair(updateRequest.CurrencyPairCode)
 	if err != nil {
