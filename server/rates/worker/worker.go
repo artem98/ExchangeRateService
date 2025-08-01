@@ -2,11 +2,11 @@ package worker
 
 import (
 	"fmt"
+
+	"github.com/artem98/ExchangeRateService/server/constants"
 )
 
 type Job = func() error
-
-const queueSize = 200
 
 type Worker struct {
 	hasStarted bool
@@ -14,7 +14,7 @@ type Worker struct {
 }
 
 func MakeWorker() *Worker {
-	return &Worker{hasStarted: false, jobs: make(chan Job, queueSize)}
+	return &Worker{hasStarted: false, jobs: make(chan Job, constants.WorkerQueueSize)}
 }
 
 func (w *Worker) PlanJob(job Job) {

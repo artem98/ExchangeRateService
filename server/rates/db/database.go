@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/artem98/ExchangeRateService/server/constants"
 	"github.com/artem98/ExchangeRateService/server/rates/external"
 	_ "github.com/lib/pq"
 )
@@ -38,11 +39,9 @@ func MakeDataBaseAdapter() (DataBaseAdapter, error) {
 }
 
 func initDataBaseInterface() (database *sql.DB, err error) {
-	const maxAttempts = 10
-
 	dsn := "host=db port=5432 user=postgres password=postgres dbname=esr sslmode=disable"
 
-	for i := 1; i <= maxAttempts; i++ {
+	for i := 1; i <= constants.NumOfAttemptsToConnectDB; i++ {
 		database, err = sql.Open("postgres", dsn)
 		if err != nil {
 			return nil, fmt.Errorf("failed to open DB: %v", err)
@@ -53,7 +52,7 @@ func initDataBaseInterface() (database *sql.DB, err error) {
 			fmt.Println("Connected to database!")
 			break
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(constants.PauseToWaitDBConnection)
 
 	}
 	if err != nil {

@@ -78,6 +78,10 @@ The `client` is a simple Go-based CLI tool for testing.
 
 ---
 
+## Config tips
+
+- Server params can be configured in `server/constants/constants.go` file
+
 ## Русская версия
 
 Это сервис валютных котировок с асинхронным обновлением и простой клиент для ручного тестирования.
@@ -153,3 +157,8 @@ The `client` is a simple Go-based CLI tool for testing.
 
 - Go 1.24.5+
 - Docker и Docker Compose
+
+## Управление конфигурацией
+
+-  Параметры серверы могут быть настроены в файле `server/constants/constants.go`
+

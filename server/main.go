@@ -3,12 +3,12 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	// "encoding/json"
 
+	"github.com/artem98/ExchangeRateService/server/constants"
 	"github.com/artem98/ExchangeRateService/server/rates/db"
 	"github.com/artem98/ExchangeRateService/server/rates/handlers"
 	"github.com/artem98/ExchangeRateService/server/rates/worker"
@@ -29,7 +29,7 @@ func main() {
 	ratesHandler := &handlers.Handler{
 		Db:     dbAdapter,
 		Worker: worker.MakeWorker(),
-		Cache:  worker.MakeRateJobsCache(time.Minute),
+		Cache:  worker.MakeRateJobsCache(constants.CacheTTL),
 	}
 
 	router := chi.NewRouter()
