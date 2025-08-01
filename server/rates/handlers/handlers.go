@@ -33,6 +33,7 @@ type Worker interface {
 type Handler struct {
 	Db     db.DataBase
 	Worker Worker
+	Cache  *worker.RateJobsCache
 }
 
 func (h *Handler) HandleRates(r chi.Router) {
@@ -128,13 +129,26 @@ func (h *Handler) handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Req
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	requestId, err := h.Db.PlaceRequest(currency1, currency2)
+	requestId, found := h.Cache.Get(currency1, currency2)
+	if found {
+		fmt.Println("Found cached recent request")
+		response := UpdateResponse{UpdateID: requestId}
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(response)
+		if err != nil {
+			http.Error(w, "internal json problem", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	requestId, err = h.Db.PlaceRequest(currency1, currency2)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	h.Worker.PlanJob(worker.MakeRateUpdateJob(currency1, currency2, requestId, h.Db))
+	h.Cache.Set(currency1, currency2, requestId)
 
 	response := UpdateResponse{UpdateID: requestId}
 	w.Header().Set("Content-Type", "application/json")

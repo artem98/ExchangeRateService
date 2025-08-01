@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -28,6 +29,7 @@ func main() {
 	ratesHandler := &handlers.Handler{
 		Db:     dbAdapter,
 		Worker: worker.MakeWorker(),
+		Cache:  worker.MakeRateJobsCache(time.Minute),
 	}
 
 	router := chi.NewRouter()
