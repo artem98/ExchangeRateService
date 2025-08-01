@@ -127,6 +127,7 @@ func (h *Handler) handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Req
 	currency1, currency2, err := utils.ParseCurrencyPair(updateRequest.CurrencyPairCode)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	requestId, found := h.Cache.Get(currency1, currency2)
