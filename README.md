@@ -17,7 +17,8 @@ This application provides a currency exchange rate service with asynchronous upd
 - PostgreSQL for persistent storage
 - Simple HTTP JSON API
 - Dockerized server with `docker-compose`
-- Minimal CLI client for testing (not containerized)
+- Minimal CLI client for manual testing (not containerized)
+- Update requests idempotency
 
 ---
 
@@ -25,6 +26,7 @@ This application provides a currency exchange rate service with asynchronous upd
 
 1. Build and start the server + database:
    ```sh
+   cd server
    docker-compose up --build
    ```
 
@@ -88,10 +90,23 @@ The `client` is a simple Go-based CLI tool for testing.
 
 ---
 
+## Особенности
+
+- Асинхронное обновление валютных курсов
+- Интеграция внешнего API обменных курсов
+- PostgreSQL в качестве базы данных
+- HTTP JSON API
+- Контейнеризированный сервер и БД с помощью `docker-compose`
+- Минимальный CLI клиент для ручного тестирования (не контейнеризированный)
+- Идемпотентность запросов обновлений
+
+---
+
 ### Запуск сервера (Docker)
 
 1. Соберите и запустите:
    ```sh
+   cd server
    docker-compose up --build
    ```
 
