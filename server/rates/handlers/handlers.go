@@ -59,6 +59,7 @@ func (h *Handler) handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 	currency1, currency2, err := utils.ParseCurrencyPair(currencyPair)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	rate, timestamp, err := h.Db.GetRateByPair(currency1, currency2)
@@ -75,6 +76,7 @@ func (h *Handler) handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Entered handleGetRateByUpdateId, url", r.URL)
 	updateId := chi.URLParam(r, "id")
 	if updateId == "" {
 		http.Error(w, "Update request id is required", http.StatusNotFound)
