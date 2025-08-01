@@ -4,12 +4,6 @@ import (
 	"fmt"
 )
 
-// type Job struct {
-// 	Currency1 string
-// 	Currency2 string
-// 	ReqId     uint64
-// }
-
 type Job = func() error
 
 const queueSize = 200
