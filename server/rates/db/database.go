@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/artem98/ExchangeRateService/server/rates/external"
@@ -79,7 +78,7 @@ func fillRatesAtStart() error {
 		if err != nil {
 			return err
 		}
-		err = updateRate(currency1, currency2, rate)
+		err = UpdateRate(currency1, currency2, rate)
 
 		if err != nil {
 			return err
@@ -90,31 +89,8 @@ func fillRatesAtStart() error {
 	return nil
 }
 
-func parseCurrencyPair(input string) (string, string, error) {
-	if len(input) != 7 {
-		return "", "", fmt.Errorf("invalid currency pair format: expected 'XXX/YYY'")
-	}
-	upper := strings.ToUpper(input)
-	parts := strings.Split(upper, "/")
-
-	if len(parts) != 2 {
-		return "", "", fmt.Errorf("invalid currency pair format: expected 'XXX/YYY'")
-	}
-
-	if len(parts[0]) != 3 || len(parts[1]) != 3 {
-		return "", "", fmt.Errorf("invalid currency pair format: expected 'XXX/YYY'")
-	}
-
-	return parts[0], parts[1], nil
-}
-
-func PlaceRequest(CurrencyPairCode string) (uint64, error) {
+func PlaceRequest(currency1, currency2 string) (uint64, error) {
 	var id uint64
-
-	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
-	if err != nil {
-		return 0, err
-	}
 
 	if database == nil {
 		return 0, fmt.Errorf("database is not initialized yet")
@@ -125,26 +101,15 @@ func PlaceRequest(CurrencyPairCode string) (uint64, error) {
         VALUES ($1, $2, $3)
         RETURNING id;
     `
-	err = database.QueryRow(query, currency1, currency2, "submitted").Scan(&id)
+	err := database.QueryRow(query, currency1, currency2, "submitted").Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert rate: %w", err)
 	}
 
-	planJob(job{Currency1: currency1, Currency2: currency2, ReqId: id})
-
 	return id, nil
 }
 
-func GetRateByPairCode(CurrencyPairCode string) (float64, time.Time, error) {
-	currency1, currency2, err := parseCurrencyPair(CurrencyPairCode)
-	if err != nil {
-		return 0, time.Time{}, err
-	}
-
-	return getRateByPair(currency1, currency2)
-}
-
-func getRateByPair(currency1, currency2 string) (float64, time.Time, error) {
+func GetRateByPair(currency1, currency2 string) (float64, time.Time, error) {
 	if database == nil {
 		return 0, time.Time{}, errors.New("database not initialized")
 	}
@@ -184,10 +149,10 @@ func GetRateByRequestId(requestId uint64) (float64, time.Time, error) {
 		return 0, time.Time{}, fmt.Errorf("failed to query request: %w", err)
 	}
 
-	return getRateByPair(currency1, currency2)
+	return GetRateByPair(currency1, currency2)
 }
 
-func markRequestAsProcessed(requestId uint64) error {
+func MarkRequestAsProcessed(requestId uint64) error {
 	if database == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -200,7 +165,7 @@ func markRequestAsProcessed(requestId uint64) error {
 	return nil
 }
 
-func markRequestAsFailed(requestId uint64) error {
+func MarkRequestAsFailed(requestId uint64) error {
 	if database == nil {
 		return fmt.Errorf("database not initialized")
 	}
@@ -213,7 +178,7 @@ func markRequestAsFailed(requestId uint64) error {
 	return nil
 }
 
-func updateRate(currency1, currency2 string, rate float64) error {
+func UpdateRate(currency1, currency2 string, rate float64) error {
 	if database == nil {
 		return fmt.Errorf("database not initialized")
 	}

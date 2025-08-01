@@ -1,4 +1,4 @@
-package rates
+package handlers
 
 import (
 	"encoding/json"
@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/artem98/ExchangeRateService/server/rates/db"
+	"github.com/artem98/ExchangeRateService/server/rates/utils"
+	"github.com/artem98/ExchangeRateService/server/rates/worker"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -26,13 +28,13 @@ type RateResponse struct {
 
 func HandleRatesRequest(r chi.Router) {
 	r.Route("/update_requests", func(r chi.Router) {
-		r.Get("/{id}", withRecovery(handleGetRateByUpdateId))
-		r.Post("/", withRecovery(handlePostRateUpdateRequest))
+		r.Get("/{id}", handlerWithMiddleware(handleGetRateByUpdateId))
+		r.Post("/", handlerWithMiddleware(handlePostRateUpdateRequest))
 		r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Only POST and GET are allowed", http.StatusMethodNotAllowed)
 		}))
 	})
-	r.Get("/", withRecovery(handleGetRateByCode))
+	r.Get("/", handlerWithMiddleware(handleGetRateByCode))
 	r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
 	}))
@@ -45,9 +47,12 @@ func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("Received GET req by code", currencyPair)
+	currency1, currency2, err := utils.ParseCurrencyPair(currencyPair)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 
-	rate, timestamp, err := db.GetRateByPairCode(currencyPair)
+	rate, timestamp, err := db.GetRateByPair(currency1, currency2)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -63,16 +68,14 @@ func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 	updateId := chi.URLParam(r, "id")
 	if updateId == "" {
-		http.Error(w, "Update request id is required", http.StatusBadRequest)
+		http.Error(w, "Update request id is required", http.StatusNotFound)
 		return
 	}
-
-	fmt.Println("Recieved GET req by id", updateId)
 
 	id, err := strconv.ParseUint(updateId, 10, 64)
 
 	if err != nil {
-		http.Error(w, "Update request id must be uint64", http.StatusBadRequest)
+		http.Error(w, "Update request id must be uint64", http.StatusNotFound)
 		return
 	}
 
@@ -89,8 +92,6 @@ func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Recieved POST req")
-
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
@@ -111,28 +112,23 @@ func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("  request: %v\n", updateRequest)
 
-	requestId, err := db.PlaceRequest(updateRequest.CurrencyPairCode)
+	currency1, currency2, err := utils.ParseCurrencyPair(updateRequest.CurrencyPairCode)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	requestId, err := db.PlaceRequest(currency1, currency2)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	worker.PlanJob(worker.Job{Currency1: currency1, Currency2: currency2, ReqId: requestId})
 
 	response := UpdateResponse{UpdateID: requestId}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(response)
 	if err != nil {
 		http.Error(w, "internal json problem", http.StatusInternalServerError)
-	}
-}
-
-func withRecovery(h http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if rec := recover(); rec != nil {
-				fmt.Println("Recovered in handler:", rec)
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			}
-		}()
-		h(w, r)
 	}
 }

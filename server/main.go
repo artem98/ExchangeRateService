@@ -8,8 +8,8 @@ import (
 
 	// "encoding/json"
 
-	"github.com/artem98/ExchangeRateService/server/rates"
 	"github.com/artem98/ExchangeRateService/server/rates/db"
+	"github.com/artem98/ExchangeRateService/server/rates/handlers"
 )
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +25,7 @@ func main() {
 	defer db.CloseDB()
 
 	router := chi.NewRouter()
-	router.Route("/rates", rates.HandleRatesRequest)
+	router.Route("/rates", handlers.HandleRatesRequest)
 	router.HandleFunc("/", defaultHandler)
 
 	fmt.Println("Server started")

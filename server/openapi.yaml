@@ -23,9 +23,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/RateResponse'
         '400':
-          description: Missing currency pair
+          description: Missing or invalid currency pair
         '500':
-          description: Rate not found or Database problem or Invalid currency pair
+          description: Rate not found or Database problem
 
   /rates/update_requests/:
     post:
@@ -45,11 +45,11 @@ paths:
               schema:
                 $ref: '#/components/schemas/UpdateResponse'
         '400':
-          description: Invalid request body
+          description: Invalid JSON
         '415':
           description: Not json object
         '500':
-          description: Database or JSON problem
+          description: Database problem
 
 
   /rates/update_requests/{id}:
