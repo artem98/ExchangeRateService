@@ -10,6 +10,7 @@ import (
 
 	"github.com/artem98/ExchangeRateService/server/rates/db"
 	"github.com/artem98/ExchangeRateService/server/rates/handlers"
+	"github.com/artem98/ExchangeRateService/server/rates/worker"
 )
 
 func defaultHandler(w http.ResponseWriter, r *http.Request) {
@@ -17,15 +18,20 @@ func defaultHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	err := db.InitDataBaseInterface()
+	dbAdapter, err := db.MakeDataBaseAdapter()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
-	defer db.CloseDB()
+	defer dbAdapter.CloseDB()
+
+	ratesHandler := &handlers.Handler{
+		Db:     dbAdapter,
+		Worker: worker.MakeWorker(),
+	}
 
 	router := chi.NewRouter()
-	router.Route("/rates", handlers.HandleRatesRequest)
+	router.Route("/rates", ratesHandler.HandleRates)
 	router.HandleFunc("/", defaultHandler)
 
 	fmt.Println("Server started")

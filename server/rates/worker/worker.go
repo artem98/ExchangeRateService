@@ -2,66 +2,55 @@ package worker
 
 import (
 	"fmt"
-
-	"github.com/artem98/ExchangeRateService/server/rates/db"
-	"github.com/artem98/ExchangeRateService/server/rates/external"
 )
 
-type Job struct {
-	Currency1 string
-	Currency2 string
-	ReqId     uint64
-}
+// type Job struct {
+// 	Currency1 string
+// 	Currency2 string
+// 	ReqId     uint64
+// }
+
+type Job = func() error
 
 const queueSize = 200
 
-var jobs = make(chan Job, queueSize)
-
-var hasStarted bool = false
-
-func PlanJob(job Job) {
-	if !hasStarted {
-		start()
-	}
-	jobs <- job
+type Worker struct {
+	hasStarted bool
+	jobs       chan Job
 }
 
-func start() {
-	hasStarted = true
-	go func() {
-		for job := range jobs {
-			fmt.Println("Worker received currency pair", job)
+func MakeWorker() *Worker {
+	return &Worker{hasStarted: false, jobs: make(chan Job, queueSize)}
+}
 
-			err := processJob(job)
+func (w *Worker) PlanJob(job Job) {
+	if !w.hasStarted {
+		w.start()
+	}
+	w.jobs <- job
+}
+
+func (w *Worker) start() {
+	w.hasStarted = true
+	go func() {
+		for job := range w.jobs {
+			err := w.processJob(job)
 			if err != nil {
-				fmt.Println("Failed to process request ", job.ReqId, ":", err)
+				fmt.Printf("Failed to process job %v : %s", job, err.Error())
 			}
 		}
 	}()
 }
 
-func processJob(job Job) (err error) {
-	var rate float64
+func (w *Worker) processJob(job Job) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println("Recovered in processJob:", r)
-			db.MarkRequestAsFailed(job.ReqId)
 			err = fmt.Errorf("panic occurred: %v", r)
 		}
 	}()
 
-	rate, err = external.FetchRate(job.Currency1, job.Currency2)
+	fmt.Println("Worker starts processing new job")
 
-	if err != nil {
-		db.MarkRequestAsFailed(job.ReqId)
-		return err
-	}
-
-	err = db.UpdateRate(job.Currency1, job.Currency2, rate)
-	if err != nil {
-		db.MarkRequestAsFailed(job.ReqId)
-		return err
-	}
-
-	return db.MarkRequestAsProcessed(job.ReqId)
+	return job()
 }

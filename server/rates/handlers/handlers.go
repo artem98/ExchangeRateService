@@ -26,21 +26,30 @@ type RateResponse struct {
 	Timestamp time.Time `json:"update_time"`
 }
 
-func HandleRatesRequest(r chi.Router) {
+type Worker interface {
+	PlanJob(job worker.Job)
+}
+
+type Handler struct {
+	Db     db.DataBase
+	Worker Worker
+}
+
+func (h *Handler) HandleRates(r chi.Router) {
 	r.Route("/update_requests", func(r chi.Router) {
-		r.Get("/{id}", handlerWithMiddleware(handleGetRateByUpdateId))
-		r.Post("/", handlerWithMiddleware(handlePostRateUpdateRequest))
+		r.Get("/{id}", handlerWithMiddleware(h.handleGetRateByUpdateId))
+		r.Post("/", handlerWithMiddleware(h.handlePostRateUpdateRequest))
 		r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Only POST and GET are allowed", http.StatusMethodNotAllowed)
 		}))
 	})
-	r.Get("/", handlerWithMiddleware(handleGetRateByCode))
+	r.Get("/", handlerWithMiddleware(h.handleGetRateByCode))
 	r.MethodNotAllowed(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Only GET is allowed", http.StatusMethodNotAllowed)
 	}))
 }
 
-func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 	currencyPair := r.URL.Query().Get("currency_pair")
 	if currencyPair == "" {
 		http.Error(w, "currency_pair query parameter is required", http.StatusBadRequest)
@@ -52,7 +61,7 @@ func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	rate, timestamp, err := db.GetRateByPair(currency1, currency2)
+	rate, timestamp, err := h.Db.GetRateByPair(currency1, currency2)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -65,7 +74,7 @@ func handleGetRateByCode(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 	updateId := chi.URLParam(r, "id")
 	if updateId == "" {
 		http.Error(w, "Update request id is required", http.StatusNotFound)
@@ -79,7 +88,7 @@ func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rate, timestamp, err := db.GetRateByRequestId(id)
+	rate, timestamp, err := h.Db.GetRateByRequestId(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -91,7 +100,7 @@ func handleGetRateByUpdateId(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != "application/json" {
 		http.Error(w, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
 		return
@@ -117,13 +126,13 @@ func handlePostRateUpdateRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	requestId, err := db.PlaceRequest(currency1, currency2)
+	requestId, err := h.Db.PlaceRequest(currency1, currency2)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	worker.PlanJob(worker.Job{Currency1: currency1, Currency2: currency2, ReqId: requestId})
+	h.Worker.PlanJob(worker.MakeRateUpdateJob(currency1, currency2, requestId, h.Db))
 
 	response := UpdateResponse{UpdateID: requestId}
 	w.Header().Set("Content-Type", "application/json")

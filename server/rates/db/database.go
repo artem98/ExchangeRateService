@@ -10,18 +10,42 @@ import (
 	_ "github.com/lib/pq"
 )
 
-var database *sql.DB
+type DataBase interface {
+	GetRateByPair(cur1, cur2 string) (float64, time.Time, error)
+	GetRateByRequestId(id uint64) (float64, time.Time, error)
+	PlaceRequest(cur1, cur2 string) (uint64, error)
+	MarkRequestAsProcessed(requestId uint64) error
+	MarkRequestAsFailed(requestId uint64) error
+	UpdateRate(currency1, currency2 string, rate float64) error
+}
 
-func InitDataBaseInterface() error {
+type DataBaseAdapter struct {
+	database *sql.DB
+}
+
+func MakeDataBaseAdapter() (DataBaseAdapter, error) {
+	db, err := initDataBaseInterface()
+	if err != nil {
+		return DataBaseAdapter{}, err
+	}
+	a := DataBaseAdapter{database: db}
+	err = a.fillRatesAtStart()
+	if err != nil {
+		return DataBaseAdapter{}, fmt.Errorf("failed to fill DB: %v", err)
+	}
+
+	return a, nil
+}
+
+func initDataBaseInterface() (database *sql.DB, err error) {
 	const maxAttempts = 10
 
 	dsn := "host=db port=5432 user=postgres password=postgres dbname=esr sslmode=disable"
 
-	var err error
 	for i := 1; i <= maxAttempts; i++ {
 		database, err = sql.Open("postgres", dsn)
 		if err != nil {
-			return fmt.Errorf("failed to open DB: %v", err)
+			return nil, fmt.Errorf("failed to open DB: %v", err)
 		}
 
 		err = database.Ping()
@@ -33,29 +57,24 @@ func InitDataBaseInterface() error {
 
 	}
 	if err != nil {
-		return fmt.Errorf("failed to connect to DB: %v", err)
+		return nil, fmt.Errorf("failed to connect to DB: %v", err)
 	}
 
-	err = fillRatesAtStart()
-	if err != nil {
-		return fmt.Errorf("failed to fill DB: %v", err)
-	}
-
-	return nil
+	return database, nil
 }
 
-func CloseDB() {
-	if database != nil {
-		database.Close()
+func (a DataBaseAdapter) CloseDB() {
+	if a.database != nil {
+		a.database.Close()
 	}
 }
 
-func fillRatesAtStart() error {
-	if database == nil {
+func (a DataBaseAdapter) fillRatesAtStart() error {
+	if a.database == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
-	rows, err := database.Query("SELECT currency1, currency2, rate FROM rates")
+	rows, err := a.database.Query("SELECT currency1, currency2, rate FROM rates")
 	if err != nil {
 		return fmt.Errorf("failed to fetch currency pairs: %w", err)
 	}
@@ -78,7 +97,7 @@ func fillRatesAtStart() error {
 		if err != nil {
 			return err
 		}
-		err = UpdateRate(currency1, currency2, rate)
+		err = a.UpdateRate(currency1, currency2, rate)
 
 		if err != nil {
 			return err
@@ -89,10 +108,10 @@ func fillRatesAtStart() error {
 	return nil
 }
 
-func PlaceRequest(currency1, currency2 string) (uint64, error) {
+func (a DataBaseAdapter) PlaceRequest(currency1, currency2 string) (uint64, error) {
 	var id uint64
 
-	if database == nil {
+	if a.database == nil {
 		return 0, fmt.Errorf("database is not initialized yet")
 	}
 
@@ -101,7 +120,7 @@ func PlaceRequest(currency1, currency2 string) (uint64, error) {
         VALUES ($1, $2, $3)
         RETURNING id;
     `
-	err := database.QueryRow(query, currency1, currency2, "submitted").Scan(&id)
+	err := a.database.QueryRow(query, currency1, currency2, "submitted").Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert rate: %w", err)
 	}
@@ -109,8 +128,8 @@ func PlaceRequest(currency1, currency2 string) (uint64, error) {
 	return id, nil
 }
 
-func GetRateByPair(currency1, currency2 string) (float64, time.Time, error) {
-	if database == nil {
+func (a DataBaseAdapter) GetRateByPair(currency1, currency2 string) (float64, time.Time, error) {
+	if a.database == nil {
 		return 0, time.Time{}, errors.New("database not initialized")
 	}
 
@@ -121,7 +140,7 @@ func GetRateByPair(currency1, currency2 string) (float64, time.Time, error) {
         WHERE currency1 = $1 AND currency2 = $2
         LIMIT 1
     `
-	err := database.QueryRow(query, currency1, currency2).Scan(&rate, &timestamp)
+	err := a.database.QueryRow(query, currency1, currency2).Scan(&rate, &timestamp)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return 0, time.Time{}, errors.New("no such pair")
@@ -132,13 +151,13 @@ func GetRateByPair(currency1, currency2 string) (float64, time.Time, error) {
 	return rate, timestamp, nil
 }
 
-func GetRateByRequestId(requestId uint64) (float64, time.Time, error) {
-	if database == nil {
+func (a DataBaseAdapter) GetRateByRequestId(requestId uint64) (float64, time.Time, error) {
+	if a.database == nil {
 		return 0, time.Time{}, errors.New("database not initialized")
 	}
 
 	var currency1, currency2 string
-	err := database.QueryRow(`
+	err := a.database.QueryRow(`
         SELECT currency1, currency2 FROM update_requests
         WHERE id = $1
     `, requestId).Scan(&currency1, &currency2)
@@ -149,37 +168,37 @@ func GetRateByRequestId(requestId uint64) (float64, time.Time, error) {
 		return 0, time.Time{}, fmt.Errorf("failed to query request: %w", err)
 	}
 
-	return GetRateByPair(currency1, currency2)
+	return a.GetRateByPair(currency1, currency2)
 }
 
-func MarkRequestAsProcessed(requestId uint64) error {
-	if database == nil {
+func (a DataBaseAdapter) MarkRequestAsProcessed(requestId uint64) error {
+	if a.database == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
 	query := `UPDATE update_requests SET request_status = 'ok' WHERE id = $1`
-	_, err := database.Exec(query, requestId)
+	_, err := a.database.Exec(query, requestId)
 	if err != nil {
 		return fmt.Errorf("failed to mark request as processed: %w", err)
 	}
 	return nil
 }
 
-func MarkRequestAsFailed(requestId uint64) error {
-	if database == nil {
+func (a DataBaseAdapter) MarkRequestAsFailed(requestId uint64) error {
+	if a.database == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
 	query := `UPDATE update_requests SET request_status = 'failed' WHERE id = $1`
-	_, err := database.Exec(query, requestId)
+	_, err := a.database.Exec(query, requestId)
 	if err != nil {
 		return fmt.Errorf("failed to mark request as failed: %w", err)
 	}
 	return nil
 }
 
-func UpdateRate(currency1, currency2 string, rate float64) error {
-	if database == nil {
+func (a DataBaseAdapter) UpdateRate(currency1, currency2 string, rate float64) error {
+	if a.database == nil {
 		return fmt.Errorf("database not initialized")
 	}
 
@@ -191,7 +210,7 @@ func UpdateRate(currency1, currency2 string, rate float64) error {
             update_time = EXCLUDED.update_time;
     `
 
-	_, err := database.Exec(query, currency1, currency2, rate, time.Now())
+	_, err := a.database.Exec(query, currency1, currency2, rate, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to upsert rate: %w", err)
 	}
