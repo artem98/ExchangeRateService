@@ -35,7 +35,7 @@ MAIN_LOOP:
 		}
 
 		parts := strings.SplitN(line, " ", 2)
-		cmd := strings.ToLower(parts[0])
+		cmd := strings.ToLower(strings.TrimSpace(parts[0]))
 
 		switch cmd {
 		case "help":
@@ -45,13 +45,13 @@ MAIN_LOOP:
 				fmt.Println("Missing JSON body for POST.")
 				continue
 			}
-			handlePost(*addr, parts[1])
+			handlePost(*addr, strings.TrimSpace(parts[1]))
 		case "get":
 			if len(parts) < 2 {
 				fmt.Println("Missing parameter for GET.")
 				continue
 			}
-			handleGet(*addr, parts[1])
+			handleGet(*addr, strings.TrimSpace(parts[1]))
 		case "quit":
 			break MAIN_LOOP
 		default:
